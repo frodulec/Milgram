@@ -1,0 +1,26 @@
+[tool.poetry]
+name = "milgram"
+version = "0.1.0"
+description = ""
+authors = ["frodulec <jakubkrasniewski@gmail.com>"]
+readme = "README.md"
+package-mode = true
+packages = [{include = "*", from = "."}]
+
+[tool.poetry.dependencies]
+python = ">=3.9,<3.9.7 || >3.9.7,<3.12"
+python-dotenv = "^1.0.1"
+pyautogen = "^0.2.32"
+fastapi = "^0.115.12"
+pygame = "^2.6.1"
+pygbag = "^0.9.2"
+pillow = "^11.2.1"
+autogen = "^0.9.1.post0"
+loguru = "^0.7.3"
+ruff = "^0.11.11"
+streamlit = "^1.45.1"
+uvicorn = "^0.34.2"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
