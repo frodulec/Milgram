@@ -43,6 +43,20 @@ def check_termination(message) -> bool:
     return False
 
 
+def check_if_administered_shock(message) -> bool:
+    # find the index of all messages that contains the tool call
+    found_tool_calls = []
+    for tool_call in message.get("tool_calls", []):
+        if tool_call["function"]["name"] == "Administer-shock":
+            found_tool_calls.append(tool_call)
+    
+    # check whether 'learner_answered_incorrectly' is True
+    return any(
+        json.loads(tool_call["function"]["arguments"]).get("learner_answered_incorrectly", False)
+        and json.loads(tool_call["function"]["arguments"]).get("learner_was_asked_question", False)
+        for tool_call in found_tool_calls
+    )
+
 def convert_chat_history_to_json(
     chat: ChatResult, output_file_path: str = "conversation.json"
 ) -> list[dict]:
@@ -55,21 +69,25 @@ def convert_chat_history_to_json(
         message
         for message in chat.chat_history
         if message["name"] in agent_names_mapping
+        and message["content"] != ""
+        and "NARRATOR_MESSAGE" not in message["content"]
     ]
     data = [
         {
-            "speaker": agent_names_mapping[message["name"]],
+            "speaker": "SHOCKING_DEVICE"
+            if check_if_administered_shock(message)
+            else agent_names_mapping[message["name"]],
             "text": "ELECTRIC_SHOCK_IMAGE"
-            if any(
-                tool_call["function"]["name"] == "Administer-shock"
-                for tool_call in message.get("tool_calls", [])
-            )
+            if check_if_administered_shock(message)
             else message["content"],
             "delay": len(message["content"]) / 30 + 1,  # 1 as minimum delay
         }
         for message in messages_of_people
     ]
-    # dump
+
+    # skip those containint "None"
+    data = [message for message in data if "None" not in message["text"]]
+
     with open(output_file_path, "w") as f:
         json.dump(data, f, indent=4)
     return data

@@ -15,7 +15,12 @@ from utils.chat_utils import load_conversation_dictionary
 from utils.drawing_utils import resize_sprite, adjust_cloud
 
 # Add TTS imports
-from audio.tts import tts_queue, playback_queue, tts_worker, playback_worker, trigger_next_playback
+from audio.tts import (
+    generate_tts,
+    tts_worker,
+    playback_worker,
+    trigger_next_playback,
+)
 from models import Roles
 
 
@@ -77,6 +82,7 @@ def create_game_image(
     student_message: str | None = None,
     professor_message: str | None = None,
     learner_message: str | None = None,
+    display_shock: bool = False,
 ) -> io.BytesIO:
     """
     Generates the game image by layering sprites on a background.
@@ -86,14 +92,15 @@ def create_game_image(
     professor_sprite = Image.open("static/professor_w.png").convert("RGBA")
     student_sprite = Image.open("static/student.png").convert("RGBA")
     learner_sprite = Image.open("static/learner.png").convert("RGBA")
+    shock_sprite = Image.open("static/electricity.png").convert("RGBA")
 
     # make the sprites smaller
     professor_sprite = resize_sprite(professor_sprite, 0.58)
     # flip the professor sprite to face the student
     # professor_sprite = professor_sprite.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
     student_sprite = resize_sprite(student_sprite, 0.15)
-
     learner_sprite = resize_sprite(learner_sprite, 1.1)
+    shock_sprite = resize_sprite(shock_sprite, 0.05)
 
     # Create a new image canvas to paste everything on
     composite_image = background.copy()
@@ -113,6 +120,9 @@ def create_game_image(
 
     if learner_message:
         draw_message_on_cloud(composite_image, learner_message, (673, 275), True)
+
+    if display_shock:
+        composite_image.paste(shock_sprite, (673, 300), shock_sprite)
 
     # 4. Save the final image to an in-memory buffer
     img_buffer = io.BytesIO()
@@ -144,17 +154,13 @@ async def get_game_view(
 @app.get("/game-sequence-example")
 async def game_sequence_example():
     messages = load_conversation_dictionary("conversation.json")
-
+    
     async def generate_example_sequence():
         try:
-            # Start TTS and playback workers
-            tts_task = asyncio.create_task(tts_worker())
-            playback_task = asyncio.create_task(playback_worker())
-
-            # Start generating TTS audio
-            completion_events = []
-            generation_events = []
-
+            # Generate all audio files first
+            audio_data_list = []
+            audio_durations = []  # Store audio durations
+            
             for msg in messages:
                 speaker_role = None
                 if msg["speaker"] == "Participant":
@@ -164,16 +170,52 @@ async def game_sequence_example():
                 elif msg["speaker"] == "Learner":
                     speaker_role = Roles.LEARNER
 
-                completion_event = asyncio.Event()
-                generation_event = asyncio.Event()
-                completion_events.append(completion_event)
-                generation_events.append(generation_event)
+                if speaker_role is None:
+                    audio_data_list.append(None)
+                    audio_durations.append(0)
+                    continue
 
-                await tts_queue.put((msg["text"], speaker_role, completion_event, generation_event))
+                # Generate TTS audio
+                audio_data = await generate_tts(msg["text"], speaker_role)
+                
+                # Get bytes from BytesIO object
+                if hasattr(audio_data, 'getvalue'):
+                    audio_bytes = audio_data.getvalue()
+                else:
+                    audio_bytes = audio_data
+                
+                # Calculate audio duration
+                try:
+                    import io
+                    import tempfile
+                    import os
+                    from pydub import AudioSegment
+                    
+                    # Create a temporary file to save the audio
+                    with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as temp_file:
+                        temp_file.write(audio_bytes)
+                        temp_file.flush()
+                        
+                        # Load audio and get duration
+                        audio_segment = AudioSegment.from_file(temp_file.name)
+                        duration = len(audio_segment) / 1000.0  # Convert milliseconds to seconds
+                        
+                        # Clean up temp file
+                        os.unlink(temp_file.name)
+                    
+                    audio_durations.append(duration)
+                except Exception as e:
+                    logger.warning(f"Could not calculate audio duration: {e}")
+                    # Fallback to estimated duration based on text length
+                    # Average speaking rate is about 150-160 words per minute, or ~2.5 words per second
+                    word_count = len(msg["text"].split())
+                    estimated_duration = max(1.0, word_count / 2.5)
+                    audio_durations.append(estimated_duration)
+                
+                # Convert audio bytes to base64
+                audio_b64 = base64.b64encode(audio_bytes).decode()
+                audio_data_list.append(audio_b64)
 
-            # Wait for the first audio to be generated
-            await generation_events[0].wait()
-            
             # Send initial empty image
             image_buffer = create_game_image(None, None)
             image_b64 = base64.b64encode(image_buffer.getvalue()).decode()
@@ -182,10 +224,22 @@ async def game_sequence_example():
             await asyncio.sleep(1.0)  # Initial delay
 
             for i, msg in enumerate(messages):
-                # Reset messages - only show current speaker's message
                 current_student_message = None
                 current_professor_message = None
                 current_learner_message = None
+
+                if msg["speaker"] == "SHOCKING_DEVICE":
+                    # add shock image, remove, add shock image and remove
+                    for _ in range(2):
+                        image_buffer = create_game_image(None, None, None, True)
+                        image_b64 = base64.b64encode(image_buffer.getvalue()).decode()
+                        yield f"data: {json.dumps({'image': image_b64, 'step': i + 1})}\n\n"
+                        await asyncio.sleep(0.5)
+                        image_buffer = create_game_image(None, None, None, False)
+                        image_b64 = base64.b64encode(image_buffer.getvalue()).decode()
+                        yield f"data: {json.dumps({'image': image_b64, 'step': i + 1})}\n\n"
+                        await asyncio.sleep(0.5)
+                    continue
 
                 # Set only the current speaker's message
                 if msg["speaker"] == Roles.PARTICIPANT.value:
@@ -194,9 +248,6 @@ async def game_sequence_example():
                     current_professor_message = msg["text"]
                 elif msg["speaker"] == Roles.LEARNER.value:
                     current_learner_message = msg["text"]
-                
-                if current_student_message == "ELECTRIC_SHOCK_IMAGE":
-                    pass  # Handle special case
 
                 # Generate and show image with current message
                 image_buffer = create_game_image(
@@ -205,34 +256,31 @@ async def game_sequence_example():
                     current_learner_message,
                 )
                 image_b64 = base64.b64encode(image_buffer.getvalue()).decode()
-                yield f"data: {json.dumps({'image': image_b64, 'step': i + 1})}\n\n"
-
-                # Trigger playback for this message
-                await trigger_next_playback()
                 
-                # Wait for this specific message's audio to finish playing
-                await completion_events[i].wait()
-
-            # Wait for any remaining TTS and playback to finish
-            await tts_queue.join()
-            await playback_queue.join()
-
-            # Cancel worker tasks
-            tts_task.cancel()
-            playback_task.cancel()
-
-            try:
-                await tts_task
-                await playback_task
-            except asyncio.CancelledError:
-                pass
+                # Send image first
+                yield f"data: {json.dumps({'image': image_b64, 'step': i + 1})}\n\n"
+                
+                # Small delay to ensure image is displayed before audio starts
+                await asyncio.sleep(0.1)
+                
+                # Then send audio if available
+                if audio_data_list[i] is not None:
+                    audio_response = {'audio': audio_data_list[i], 'step': i + 1}
+                    yield f"data: {json.dumps(audio_response)}\n\n"
+                    
+                    # Wait for actual audio duration plus small buffer
+                    audio_duration = audio_durations[i]
+                    await asyncio.sleep(audio_duration + 0.5)  # Add 0.5s buffer
+                else:
+                    # If no audio, just wait a bit before next message
+                    await asyncio.sleep(1.0)
 
             # Keep connection alive for a bit before closing
             await asyncio.sleep(2.0)
             yield f"data: {json.dumps({'complete': True})}\n\n"
 
         except Exception as e:
-            logger.error(f"Stream error: {e}")  # Server-side logging
+            logger.error(f"Stream error: {e}")
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
 
     return StreamingResponse(
@@ -254,47 +302,185 @@ async def make_example():
     <html>
     <head>
         <title>Game Sequence Example</title>
+        <style>
+            body { font-family: Arial, sans-serif; padding: 20px; }
+            #startButton { 
+                padding: 15px 30px; 
+                font-size: 18px; 
+                background-color: #4CAF50; 
+                color: white; 
+                border: none; 
+                border-radius: 5px; 
+                cursor: pointer; 
+                margin-bottom: 20px;
+            }
+            #startButton:hover { background-color: #45a049; }
+            #startButton:disabled { 
+                background-color: #cccccc; 
+                cursor: not-allowed; 
+            }
+            #controls { margin-bottom: 20px; }
+            .control-button {
+                padding: 10px 20px;
+                margin: 5px;
+                font-size: 14px;
+                border: none;
+                border-radius: 3px;
+                cursor: pointer;
+            }
+            #muteButton { background-color: #ff9800; color: white; }
+            #volumeControl { margin-left: 10px; }
+        </style>
     </head>
     <body>
         <h1>Game Sequence Example</h1>
+        
+        <div id="controls">
+            <button id="startButton">Start Game Sequence</button>
+            <button id="muteButton" class="control-button" style="display: none;">Mute Audio</button>
+            <input type="range" id="volumeControl" min="0" max="1" step="0.1" value="1" style="display: none;">
+            <span id="volumeLabel" style="display: none;">Volume</span>
+        </div>
+        
         <img id="gameImage" style="max-width: 800px;" />
-        <div id="status">Loading...</div>
+        <div id="status">Click "Start Game Sequence" to begin</div>
+        <audio id="audioPlayer" preload="auto"></audio>
         
         <script>
-            const eventSource = new EventSource('/game-sequence-example');
+            let eventSource = null;
+            let audioQueue = [];
+            let isPlaying = false;
+            let isMuted = false;
+            
+            const startButton = document.getElementById('startButton');
+            const muteButton = document.getElementById('muteButton');
+            const volumeControl = document.getElementById('volumeControl');
+            const volumeLabel = document.getElementById('volumeLabel');
             const img = document.getElementById('gameImage');
             const status = document.getElementById('status');
+            const audioPlayer = document.getElementById('audioPlayer');
             
-            eventSource.onopen = function(event) {
-                status.textContent = 'Connected, waiting for images...';
-                console.log('EventSource opened');
-            };
+            function base64ToBlob(base64, mimeType) {
+                const byteCharacters = atob(base64);
+                const byteNumbers = new Array(byteCharacters.length);
+                for (let i = 0; i < byteCharacters.length; i++) {
+                    byteNumbers[i] = byteCharacters.charCodeAt(i);
+                }
+                const byteArray = new Uint8Array(byteNumbers);
+                return new Blob([byteArray], { type: mimeType });
+            }
             
-            eventSource.onmessage = function(event) {
-                console.log('Received:', event.data);
-                if (event.data === 'image_update') {
-                    status.textContent = 'Starting sequence...';
-                } else {
+            async function playAudio(audioData) {
+                if (isMuted) return;
+                
+                try {
+                    // Wait for any currently playing audio to finish
+                    if (isPlaying) {
+                        audioQueue.push(audioData);
+                        return;
+                    }
+                    
+                    isPlaying = true;
+                    
+                    // Create blob from base64 audio data
+                    const audioBlob = base64ToBlob(audioData, 'audio/wav');
+                    const audioUrl = URL.createObjectURL(audioBlob);
+                    
+                    audioPlayer.src = audioUrl;
+                    audioPlayer.volume = volumeControl.value;
+                    
+                    await audioPlayer.play();
+                    
+                    // Clean up URL after playing
+                    audioPlayer.onended = () => {
+                        URL.revokeObjectURL(audioUrl);
+                        isPlaying = false;
+                        
+                        // Play next audio in queue if any
+                        if (audioQueue.length > 0) {
+                            const nextAudio = audioQueue.shift();
+                            playAudio(nextAudio);
+                        }
+                    };
+                } catch (error) {
+                    console.error('Audio playback error:', error);
+                    isPlaying = false;
+                }
+            }
+            
+            function startSequence() {
+                startButton.disabled = true;
+                startButton.textContent = 'Running...';
+                
+                // Show audio controls
+                muteButton.style.display = 'inline-block';
+                volumeControl.style.display = 'inline-block';
+                volumeLabel.style.display = 'inline-block';
+                
+                eventSource = new EventSource('/game-sequence-example');
+                
+                eventSource.onopen = function(event) {
+                    status.textContent = 'Connected, waiting for images...';
+                    console.log('EventSource opened');
+                };
+                
+                eventSource.onmessage = function(event) {
+                    console.log('Received:', event.data);
                     try {
                         const data = JSON.parse(event.data);
+                        
                         if (data.image) {
                             img.src = 'data:image/png;base64,' + data.image;
                             status.textContent = `Step ${data.step}`;
                         }
+                        
+                        if (data.audio) {
+                            // Add audio to queue for playback
+                            playAudio(data.audio);
+                        }
+                        
                         if (data.complete) {
                             status.textContent = 'Sequence complete!';
+                            startButton.textContent = 'Start Game Sequence';
+                            startButton.disabled = false;
+                            eventSource.close();
+                        }
+                        
+                        if (data.error) {
+                            status.textContent = `Error: ${data.error}`;
+                            startButton.textContent = 'Start Game Sequence';
+                            startButton.disabled = false;
                             eventSource.close();
                         }
                     } catch (e) {
                         console.error('Parse error:', e);
                     }
-                }
-            };
+                };
+                
+                eventSource.onerror = function(event) {
+                    console.error('EventSource error:', event);
+                    status.textContent = 'Error occurred - check console';
+                    startButton.textContent = 'Start Game Sequence';
+                    startButton.disabled = false;
+                };
+            }
             
-            eventSource.onerror = function(event) {
-                console.error('EventSource error:', event);
-                status.textContent = 'Error occurred - check console';
-            };
+            // Event listeners
+            startButton.addEventListener('click', startSequence);
+            
+            muteButton.addEventListener('click', function() {
+                isMuted = !isMuted;
+                muteButton.textContent = isMuted ? 'Unmute Audio' : 'Mute Audio';
+                muteButton.style.backgroundColor = isMuted ? '#f44336' : '#ff9800';
+                
+                if (isMuted && !audioPlayer.paused) {
+                    audioPlayer.pause();
+                }
+            });
+            
+            volumeControl.addEventListener('input', function() {
+                audioPlayer.volume = this.value;
+            });
         </script>
     </body>
     </html>

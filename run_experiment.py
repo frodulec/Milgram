@@ -11,7 +11,7 @@ from instructions import (
     INITIAL_MESSAGE,
     PROFESSOR_SYSTEM_MESSAGE,
     CHAT_MANAGER_SYSTEM_MESSAGE,
-    SPEAKER_SELECTOR_MESSAGE
+    SPEAKER_SELECTOR_MESSAGE,
 )
 from utils.chat_utils import convert_chat_history_to_json
 import logging
@@ -37,12 +37,22 @@ CURRENT_STATE = States.START
 CURRENT_VOLTAGE = 0
 
 
-def press_button():
-    """Press the button to increase voltage.
+def press_button(learner_answered_incorrectly: bool, learner_was_asked_question: bool):
+    """
+    Press the button to increase voltage.
+    Should be called only after the Learner has been asked a question and answered the question.
     Raises the current voltage by 15 volts."""
+    if not learner_was_asked_question:
+        return (
+            "NARRATOR_MESSAGE: Learner was not asked a question. Cannot press button."
+        )
     global CURRENT_VOLTAGE
-    CURRENT_VOLTAGE += 15
-    return f"Current voltage: {CURRENT_VOLTAGE} volts"
+    if learner_answered_incorrectly:
+        CURRENT_VOLTAGE += 15
+        return f"NARRATOR_MESSAGE: Learner was incorrect and the button was pressed. Current voltage: {CURRENT_VOLTAGE} volts"
+
+    else:
+        return f"NARRATOR_MESSAGE: Learner was correct. The button was not pressed."
 
 
 def start_experiment():
@@ -81,11 +91,14 @@ def start_experiment():
     # Register the function signature with the agent that will suggest the call
     participant.register_for_llm(
         name="Administer-shock",
-        description="Function that raises the voltage and applies the voltage to the lernear for bad answers. It should be only used when the learner gives a wrong answer.",
+        description="Function that raises the voltage and applies the voltage to the lernear for bad answers. Can only be used after the learner has answered a question and the answer is wrong.",
     )(press_button)
 
     # Register the function implementation with the same agent for execution
-    participant.register_for_execution(name="Administer-shock")(press_button)
+    participant.register_for_execution(
+        name="Administer-shock",
+        description="Function that raises the voltage and applies the voltage to the lernear for bad answers. Can only be used after the learner has answered a question and the answer is wrong.",
+    )(press_button)
 
     proffesor = AssistantAgent(
         Roles.PROFESSOR.value,
