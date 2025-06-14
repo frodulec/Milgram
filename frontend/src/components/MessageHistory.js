@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { Box, HStack, Text, IconButton } from '@chakra-ui/react';
+import { Box, HStack, VStack, Text, IconButton } from '@chakra-ui/react';
 import { LuPin, LuPinOff } from 'react-icons/lu';
 
 const MessageHistory = ({
@@ -30,12 +30,12 @@ const MessageHistory = ({
   }
 
   return (
-    <Box
+    <VStack
       flex="1"
       bg={colorMode === 'light' ? "brand.50" : "gray.800"}
       p={4}
       borderRadius="md"
-      maxH="600px"
+      height="600px"
       overflowY="auto"
       borderWidth="1px"
       borderColor="brand.500"
@@ -70,6 +70,11 @@ const MessageHistory = ({
           {followCurrentMessage ? <LuPinOff /> : <LuPin />}
         </IconButton>
       </HStack>
+      <Box
+      height={"100%"}
+      width={"100%"}
+      overflow={"auto"}>
+
 
       {messages.map((message, index) => {
         const isCurrentlyPlaying = index === currentSyncIndex;
@@ -110,7 +115,8 @@ const MessageHistory = ({
           </Box>
         );
       })}
-    </Box>
+      </Box>
+    </VStack>
   );
 };
 

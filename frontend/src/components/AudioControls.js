@@ -1,9 +1,11 @@
 import React from 'react';
-import { Box, HStack, IconButton, Slider, Text } from '@chakra-ui/react';
+import { Box, HStack, IconButton, Slider, Text, Button} from '@chakra-ui/react';
 import { FaPlay, FaPause, FaVolumeUp, FaVolumeMute, FaForward, FaBackward } from 'react-icons/fa';
 
 const AudioControls = ({
   isPlaying,
+  isStarted,
+  runPlaybackFunc,
   isMuted,
   volume,
   playbackRate,
@@ -16,11 +18,9 @@ const AudioControls = ({
   onVolumeChange,
   onPlaybackRateChange,
   colorMode,
-  isQueueEmpty
+  isQueueEmpty,
+  hidePlayPauseButton = false
 }) => {
-  if (isQueueEmpty) {
-    return null; // Don't render controls if queue is empty
-  }
 
   return (
     <Box
@@ -35,9 +35,10 @@ const AudioControls = ({
         fontSize="md"
         fontWeight="bold"
         mb={2}
+        textAlign="center"
         color={colorMode === 'light' ? "semantic.text" : "white"}
       >
-        Audio Controls
+       Playback Controls
       </Text>
 
       {/* Playback Controls */}
@@ -51,15 +52,30 @@ const AudioControls = ({
         >
           <FaBackward />
         </IconButton>
-        <IconButton
-          size="sm"
-          onClick={onPlayPause}
-          isDisabled={currentSyncIndex === -1}
-          aria-label={isPlaying ? "Pause" : "Play"}
-          colorScheme="brand"
-        >
-          {isPlaying ? <FaPause /> : <FaPlay />}
-        </IconButton>
+
+            <Box textAlign="center">
+              <Button
+                colorScheme="brand"
+                bg="brand.500"
+                color="white"
+                size="sm"
+                onClick={runPlaybackFunc}
+              >
+                {isStarted ? (isPlaying ? "Pause Experiment" : "Resume Experiment") : "Start Experiment"}
+              </Button>
+            </Box>
+
+        {!hidePlayPauseButton && (
+          <IconButton
+            size="sm"
+            onClick={onPlayPause}
+            isDisabled={currentSyncIndex === -1}
+            aria-label={isPlaying ? "Pause" : "Play"}
+            colorScheme="brand"
+          >
+            {isPlaying ? <FaPause /> : <FaPlay />}
+          </IconButton>
+        )}
         <IconButton
           size="sm"
           onClick={onNext}
@@ -77,6 +93,7 @@ const AudioControls = ({
         >
           {isMuted ? <FaVolumeMute /> : <FaVolumeUp />}
         </IconButton>
+
       </HStack>
 
       {/* Volume Control */}
@@ -148,15 +165,6 @@ const AudioControls = ({
           {playbackRate}x
         </Text>
       </HStack>
-
-      {/* Queue Info */}
-      <Text
-        fontSize="xs"
-        color={colorMode === 'light' ? "semantic.textMuted" : "gray.300"}
-        mt={2}
-      >
-        Queue: {currentSyncIndex + 1} / {totalItems}
-      </Text>
     </Box>
   );
 };

@@ -106,27 +106,28 @@ export class ImageGenerator {
 
   
 async generateImage(params) {
-  if (!this.sprites.professor) {
-    await this.loadSprites();
-  }
+  // Wait for sprites to load if they haven't already
+  try {
+    if (!this.sprites.professor || !this.sprites.learner || !this.sprites.participant) {
+      await this.loadSprites();
+    }
 
-  this.canvas.clear();
-  
-  if (this.sprites.background) {
-    this.sprites.background.set({
-      left: 0,
-      top: 0,
-      originX: 'left',
-      originY: 'top',
-      width: this.canvas.width,
-      height: this.canvas.height
-    });
-    this.canvas.add(this.sprites.background);
-
-  } else {
-    // Fallback to color if background image failed to load
-    this.canvas.backgroundColor = '#F0F0F0';
-  }
+    this.canvas.clear();
+    
+    if (this.sprites.background) {
+      this.sprites.background.set({
+        left: 0,
+        top: 0,
+        originX: 'left',
+        originY: 'top',
+        width: this.canvas.width,
+        height: this.canvas.height
+      });
+      this.canvas.add(this.sprites.background);
+    } else {
+      // Fallback to color if background image failed to load
+      this.canvas.backgroundColor = '#F0F0F0';
+    }
 
     // Draw characters
     await this.drawCharacters();
@@ -151,37 +152,59 @@ async generateImage(params) {
       this.canvas.renderAll();
       this.canvas.lowerCanvasEl.toBlob(resolve);
     });
+  } catch (error) {
+    console.error('Error generating image:', error);
+    
+    // Return a fallback solid color image when generation fails
+    const fallbackCanvas = document.createElement('canvas');
+    fallbackCanvas.width = 1024;
+    fallbackCanvas.height = 1024;
+    const ctx = fallbackCanvas.getContext('2d');
+    ctx.fillStyle = '#F0F0F0';
+    ctx.fillRect(0, 0, 1024, 1024);
+    
+    return new Promise((resolve) => {
+      fallbackCanvas.toBlob(resolve);
+    });
   }
+}
 
   async drawCharacters() {
-    try {
+  try {
     // Professor
+    if (this.sprites.professor) {
       const professor = this.sprites.professor;
-    professor.set({
+      professor.set({
         left: this.professorPos.x - professor.getScaledWidth() / 2,
         top: this.professorPos.y - professor.getScaledHeight() / 2
-    });
+      });
+      this.canvas.add(professor);
+    }
     
     // Learner
+    if (this.sprites.learner) {
       const learner = this.sprites.learner;
-    learner.set({
+      learner.set({
         left: this.learnerPos.x - learner.getScaledWidth() / 2,
         top: this.learnerPos.y - learner.getScaledHeight() / 2
-    });
+      });
+      this.canvas.add(learner);
+    }
     
     // Participant
+    if (this.sprites.participant) {
       const participant = this.sprites.participant;
-    participant.set({
+      participant.set({
         left: this.participantPos.x - participant.getScaledWidth() / 2,
         top: this.participantPos.y - participant.getScaledHeight() / 2
-    });
-
-    this.canvas.add(professor, learner, participant);
-    } catch (error) {
-      console.error('Error drawing characters:', error);
-      throw error;
+      });
+      this.canvas.add(participant);
+    }
+  } catch (error) {
+    console.error('Error drawing characters:', error);
+    // Continue execution rather than throwing, so we can still return a partial image
   }
-  }
+}
 
 async addSpeechBubble(text, direction) {
   try {
