@@ -162,7 +162,7 @@ function App() {
       setSyncQueue(prev =>
         prev.map(queueItem =>
           queueItem.id === item.id
-            ? { ...queueItem, audioUrl }
+            ? { ...queueItem, audioBlob, audioUrl }
             : queueItem
         )
       );
@@ -190,7 +190,7 @@ function App() {
       setSyncQueue(prev =>
         prev.map(queueItem =>
           queueItem.id === item.id
-            ? { ...queueItem, imageUrl }
+            ? { ...queueItem, imageBlob, imageUrl }
             : queueItem
         )
       );
@@ -214,6 +214,21 @@ function App() {
   useEffect(() => {
     processSyncQueue();
   }, [syncQueue, processSyncQueue]);
+
+  // Cleanup blob URLs when component unmounts
+  useEffect(() => {
+    return () => {
+      // Clean up all blob URLs in the sync queue
+      syncQueue.forEach(item => {
+        if (item.audioUrl) URL.revokeObjectURL(item.audioUrl);
+        if (item.imageUrl) URL.revokeObjectURL(item.imageUrl);
+      });
+      // Clean up current image if it exists
+      if (currentImage) {
+        URL.revokeObjectURL(currentImage);
+      }
+    };
+  }, [syncQueue, currentImage]);
 
   return (
     <Box p={4} maxW="1200px" mx="auto">

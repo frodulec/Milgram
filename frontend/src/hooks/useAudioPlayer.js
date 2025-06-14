@@ -7,7 +7,7 @@ export function useAudioPlayer({ syncQueue, currentSyncIndex, setCurrentSyncInde
   const [playbackRate, setPlaybackRate] = useState(2);
   const [isManuallyPaused, setIsManuallyPaused] = useState(false);
   const [currentImage, setCurrentImage] = useState(null);
-  
+
   const audioRef = useRef(null);
 
   const playNextItem = useCallback(() => {
@@ -30,7 +30,7 @@ export function useAudioPlayer({ syncQueue, currentSyncIndex, setCurrentSyncInde
     }
   }, [syncQueue, currentSyncIndex, setCurrentSyncIndex]);
 
-  
+
   const playPreviousItem = useCallback(() => {
     const nextIndex = currentSyncIndex - 1;
 
@@ -62,38 +62,47 @@ export function useAudioPlayer({ syncQueue, currentSyncIndex, setCurrentSyncInde
       return;
     }
 
-    if (currentItem.imageUrl) {
+    if (currentItem.imageBlob) {
       setCurrentImage(prevImage => {
-        if (prevImage && prevImage !== currentItem.imageUrl) {
+        if (prevImage) {
           URL.revokeObjectURL(prevImage);
         }
-        return currentItem.imageUrl;
+        return URL.createObjectURL(currentItem.imageBlob);
       });
     }
 
-    if (currentItem.audioUrl && audioRef.current) {
+    if (currentItem.audioBlob && audioRef.current) {
       const audio = audioRef.current;
+
+      // First pause and reset the current audio
       audio.pause();
       audio.currentTime = 0;
-      audio.src = currentItem.audioUrl;
-      audio.play().catch(error => {
-        console.error('Failed to play audio:', error);
-        setIsPlaying(false);
-        playNextItem();
-      });
+
+      // Create a new blob URL for the audio
+      const audioUrl = URL.createObjectURL(currentItem.audioBlob);
+      audio.src = audioUrl;
+
+      // Wait for the audio to be loaded before playing
+      audio.onloadeddata = () => {
+        // Only attempt to play if we're still in a playing state
+        if (!isManuallyPaused) {
+          audio.play().catch(error => {
+            // Only log non-abort errors
+            if (error.name !== 'AbortError') {
+              console.error('Failed to play audio:', error);
+              setIsPlaying(false);
+              playNextItem();
+            }
+          });
+        }
+      };
+
+      // Clean up the blob URL when the audio is done
+      audio.onended = () => {
+        URL.revokeObjectURL(audioUrl);
+      };
     }
-    //else {
-    //   if (currentItem.speaker === 'SHOCKING_DEVICE') {
-    //     setTimeout(() => {
-    //       setIsPlaying(false);
-    //       playNextItem();
-    //     }, 1300);
-    //   } else {
-    //     setIsPlaying(false);
-    //     playNextItem();
-    //   }
-    // }
-  }, [syncQueue, currentSyncIndex, playNextItem]);
+  }, [syncQueue, currentSyncIndex, playNextItem, isManuallyPaused]);
 
   // Effect to automatically start the very first item
   useEffect(() => {
