@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Box, VStack, Button, HStack, IconButton} from '@chakra-ui/react';
+import { Box, VStack, Button, HStack, IconButton } from '@chakra-ui/react';
 import { LuMoon, LuSun } from "react-icons/lu"
 import { useColorMode } from "./components/ui/color-mode";
 import { imageGenerator } from './services/imageGenerator';
-import { fetchTTSAudio, getGameSequenceEventSource, getNewContersationEventSource} from './services/apiService';
+import { fetchTTSAudio, getGameSequenceEventSource, getNewContersationEventSource } from './services/apiService';
 import ImageDisplay from './components/ImageDisplay';
 import AudioControls from './components/AudioControls';
 import MessageHistory from './components/MessageHistory';
@@ -55,9 +55,9 @@ function App() {
         console.error('Failed to generate default image:', error);
       }
     };
-    
+
     loadDefaultImage();
-    
+
     return () => {
       if (currentImage) {
         URL.revokeObjectURL(currentImage);
@@ -65,18 +65,18 @@ function App() {
     };
   }, []);
 
-  const startExperience = ({new_conversation}) => {
+  const startExperience = ({ new_conversation }) => {
     // If already started, just toggle play/pause
     if (isStarted) {
       togglePlayPause();
       return;
     }
-    
+
     // Otherwise, start the experience
     setIsStarted(true);
     setIsManuallyPaused(false);
 
-    if(!new_conversation) {
+    if (!new_conversation) {
       eventSourceRef.current = getGameSequenceEventSource();
     }
     else {
@@ -125,21 +125,21 @@ function App() {
         return [];
       }
       const unprocessedItems = prevQueue.filter(item => !item.isProcessed);
-      
+
       if (unprocessedItems.length === 0 || isProcessingSync) {
         return prevQueue;
       }
-      
+
       const currentItem = unprocessedItems[0];
       setIsProcessingSync(true);
-      
+
       Promise.all([
         processAudioForItem(currentItem),
         processImageForItem(currentItem)
       ]).then(() => {
-        setSyncQueue(queue => 
-          queue.map(item => 
-            item.id === currentItem.id 
+        setSyncQueue(queue =>
+          queue.map(item =>
+            item.id === currentItem.id
               ? { ...item, isProcessed: true }
               : item
           )
@@ -149,10 +149,10 @@ function App() {
         console.error('Failed to process sync item:', error);
         setIsProcessingSync(false);
       });
-      
+
       return prevQueue;
     });
-  }, [isProcessingSync]); 
+  }, [isProcessingSync]);
 
   const processAudioForItem = async (item) => {
     try {
@@ -210,7 +210,7 @@ function App() {
       }
     }
   }, [currentSyncIndex, followCurrentMessage, messages]);
-  
+
   useEffect(() => {
     processSyncQueue();
   }, [syncQueue, processSyncQueue]);
@@ -224,7 +224,7 @@ function App() {
             bg="brand.500"
             color="white"
             size="lg"
-            onClick={() => startExperience({new_conversation: false})}
+            onClick={() => startExperience({ new_conversation: false })}
           >
             {isStarted ? (isPlaying ? "Pause Experience" : "Resume Experience") : "Start Experience"}
           </Button>
@@ -233,7 +233,7 @@ function App() {
             bg="brand.500"
             color="white"
             size="lg"
-            onClick={() => startExperience({new_conversation: true})}
+            onClick={() => startExperience({ new_conversation: true })}
           >
             {isStarted ? (isPlaying ? "Pause Experience" : "Resume Experience") : "New Conversation"}
           </Button>
@@ -246,7 +246,7 @@ function App() {
           {colorMode === "light" ? <LuSun /> : <LuMoon />}
         </IconButton>
       </HStack>
-    
+
       <HStack align="flex-start" spacing={6}>
         {/* Left Column: Image and Audio Controls */}
         <VStack flex="1" align="stretch" spacing={4}>
