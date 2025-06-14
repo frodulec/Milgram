@@ -1,16 +1,32 @@
-import React from 'react';
-import { Box, HStack, Text } from '@chakra-ui/react';
+import React, { useRef, useEffect } from 'react';
+import { Box, HStack, Text, IconButton } from '@chakra-ui/react';
+import { LuPin, LuPinOff } from 'react-icons/lu';
 
 const MessageHistory = ({
   messages,
   currentSyncIndex,
   colorMode,
+  followCurrentMessage,
+  onToggleFollow,
 }) => {
+  const messageRefs = useRef({});
+  
+  // Scroll to the current message when currentSyncIndex changes
+  useEffect(() => {
+    if (followCurrentMessage && 
+        currentSyncIndex !== null && 
+        currentSyncIndex >= 0 && 
+        messageRefs.current[currentSyncIndex]) {
+      messageRefs.current[currentSyncIndex].scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'center' // Center the message in the viewport
+      });
+    }
+  }, [currentSyncIndex, followCurrentMessage]);
+
   if (!Array.isArray(messages)) {
-    // Log an error to help diagnose why messages might not be an array.
-    // You could also return a placeholder UI here, like <Text>Loading messages...</Text>.
     console.error("MessageHistory: 'messages' prop is not an array. Received:", messages);
-    return null; // Or return a fallback UI
+    return null;
   }
 
   return (
@@ -36,6 +52,7 @@ const MessageHistory = ({
         p={2}
         borderTopRadius="md"
       >
+        {/* Header content remains the same */}
         <Text
           fontSize="lg"
           fontWeight="bold"
@@ -43,13 +60,24 @@ const MessageHistory = ({
         >
           Conversation History
         </Text>
-        </HStack>
+        <IconButton
+          aria-label="Toggle auto-scroll"
+          title={followCurrentMessage ? "Disable auto-scroll" : "Enable auto-scroll"}
+          onClick={onToggleFollow}
+          variant="outline"
+          size="sm"
+        >
+          {followCurrentMessage ? <LuPinOff /> : <LuPin />}
+        </IconButton>
+      </HStack>
+
       {messages.map((message, index) => {
         const isCurrentlyPlaying = index === currentSyncIndex;
 
         return (
           <Box
             key={index}
+            ref={el => messageRefs.current[index] = el}
             mb={2}
             p={2}
             bg={isCurrentlyPlaying
@@ -64,6 +92,7 @@ const MessageHistory = ({
             boxShadow={isCurrentlyPlaying ? "md" : "xs"}
             transition="all 0.2s ease-in-out"
           >
+            {/* Message content remains the same */}
             <Text fontWeight="bold" color={
               message.speaker === 'Professor' ? (colorMode === 'dark' ? 'brand.300' : 'brand.500') :
                 message.speaker === 'Learner' ? (colorMode === 'dark' ? 'teal.300' : 'teal.500') :

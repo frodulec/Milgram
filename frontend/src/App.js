@@ -369,6 +369,8 @@ const addToSyncQueue = (speaker, text) => {
           messages={messages}
           currentSyncIndex={currentSyncIndex}
           colorMode={colorMode}
+          followCurrentMessage={followCurrentMessage}
+          onToggleFollow={() => setFollowCurrentMessage(prev => !prev)}
         />
       </HStack>
 
