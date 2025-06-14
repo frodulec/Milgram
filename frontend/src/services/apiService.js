@@ -17,3 +17,7 @@ export const fetchTTSAudio = async (speaker, text) => {
 export const getGameSequenceEventSource = () => {
   return new EventSource('http://localhost:8000/api/game-sequence-example');
 };
+
+export const getNewContersationEventSource = () => {
+  return new EventSource('http://localhost:8000/api/run-experiment');
+};

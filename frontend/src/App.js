@@ -3,7 +3,7 @@ import { Box, VStack, Button, HStack, IconButton} from '@chakra-ui/react';
 import { LuMoon, LuSun } from "react-icons/lu"
 import { useColorMode } from "./components/ui/color-mode";
 import { imageGenerator } from './services/imageGenerator';
-import { fetchTTSAudio, getGameSequenceEventSource } from './services/apiService';
+import { fetchTTSAudio, getGameSequenceEventSource, getNewContersationEventSource} from './services/apiService';
 import ImageDisplay from './components/ImageDisplay';
 import AudioControls from './components/AudioControls';
 import MessageHistory from './components/MessageHistory';
@@ -65,7 +65,7 @@ function App() {
     };
   }, []);
 
-  const startExperience = () => {
+  const startExperience = ({new_conversation}) => {
     // If already started, just toggle play/pause
     if (isStarted) {
       togglePlayPause();
@@ -75,7 +75,13 @@ function App() {
     // Otherwise, start the experience
     setIsStarted(true);
     setIsManuallyPaused(false);
-    eventSourceRef.current = getGameSequenceEventSource();
+
+    if(!new_conversation) {
+      eventSourceRef.current = getGameSequenceEventSource();
+    }
+    else {
+      eventSourceRef.current = getNewContersationEventSource();
+    }
 
     eventSourceRef.current.onmessage = async (event) => {
       const data = JSON.parse(event.data);
@@ -218,9 +224,18 @@ function App() {
             bg="brand.500"
             color="white"
             size="lg"
-            onClick={startExperience}
+            onClick={() => startExperience({new_conversation: false})}
           >
             {isStarted ? (isPlaying ? "Pause Experience" : "Resume Experience") : "Start Experience"}
+          </Button>
+          <Button
+            colorScheme="brand"
+            bg="brand.500"
+            color="white"
+            size="lg"
+            onClick={() => startExperience({new_conversation: true})}
+          >
+            {isStarted ? (isPlaying ? "Pause Experience" : "Resume Experience") : "New Conversation"}
           </Button>
         </Box>
         <IconButton
