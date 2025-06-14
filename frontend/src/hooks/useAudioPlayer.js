@@ -81,17 +81,18 @@ export function useAudioPlayer({ syncQueue, currentSyncIndex, setCurrentSyncInde
         setIsPlaying(false);
         playNextItem();
       });
-    } else {
-      if (currentItem.speaker === 'SHOCKING_DEVICE') {
-        setTimeout(() => {
-          setIsPlaying(false);
-          playNextItem();
-        }, 1300);
-      } else {
-        setIsPlaying(false);
-        playNextItem();
-      }
     }
+    //else {
+    //   if (currentItem.speaker === 'SHOCKING_DEVICE') {
+    //     setTimeout(() => {
+    //       setIsPlaying(false);
+    //       playNextItem();
+    //     }, 1300);
+    //   } else {
+    //     setIsPlaying(false);
+    //     playNextItem();
+    //   }
+    // }
   }, [syncQueue, currentSyncIndex, playNextItem]);
 
   // Effect to automatically start the very first item

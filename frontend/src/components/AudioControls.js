@@ -1,11 +1,9 @@
 import React from 'react';
-import { Box, HStack, IconButton, Slider, Text, Button} from '@chakra-ui/react';
+import { Box, HStack, IconButton, Slider, Text, Button } from '@chakra-ui/react';
 import { FaPlay, FaPause, FaVolumeUp, FaVolumeMute, FaForward, FaBackward } from 'react-icons/fa';
 
 const AudioControls = ({
   isPlaying,
-  isStarted,
-  runPlaybackFunc,
   isMuted,
   volume,
   playbackRate,
@@ -19,9 +17,20 @@ const AudioControls = ({
   onPlaybackRateChange,
   colorMode,
   isQueueEmpty,
-  hidePlayPauseButton = false
+  hidePlayPauseButton = false,
+  isStarted = false,
+  runPlaybackFunc = null
 }) => {
+  // Make sure to use runPlaybackFunc if provided, otherwise fallback to onPlayPause
+  const handlePlaybackControl = () => {
+    if (runPlaybackFunc) {
+      runPlaybackFunc();
+    } else {
+      onPlayPause();
+    }
+  };
 
+  // Then in your button:
   return (
     <Box
       bg={colorMode === 'light' ? "brand.100" : "gray.700"}
@@ -38,7 +47,7 @@ const AudioControls = ({
         textAlign="center"
         color={colorMode === 'light' ? "semantic.text" : "white"}
       >
-       Playback Controls
+        Playback Controls
       </Text>
 
       {/* Playback Controls */}
@@ -53,17 +62,17 @@ const AudioControls = ({
           <FaBackward />
         </IconButton>
 
-            <Box textAlign="center">
-              <Button
-                colorScheme="brand"
-                bg="brand.500"
-                color="white"
-                size="sm"
-                onClick={runPlaybackFunc}
-              >
-                {isStarted ? (isPlaying ? "Pause Experiment" : "Resume Experiment") : "Start Experiment"}
-              </Button>
-            </Box>
+        <Box textAlign="center">
+          <Button
+            colorScheme="brand"
+            bg="brand.500"
+            color="white"
+            size="sm"
+            onClick={handlePlaybackControl}
+          >
+            {isStarted ? (isPlaying ? "Pause Experiment" : "Resume Experiment") : "Start Experiment"}
+          </Button>
+        </Box>
 
         {!hidePlayPauseButton && (
           <IconButton

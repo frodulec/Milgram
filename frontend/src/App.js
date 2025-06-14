@@ -149,10 +149,6 @@ function App() {
   }, [isProcessingSync]); 
 
   const processAudioForItem = async (item) => {
-    if (item.text === 'ELECTRIC_SHOCK_IMAGE') {
-      return;
-    }
-    
     try {
       const audioBlob = await fetchTTSAudio(item.speaker, item.text);
       const audioUrl = URL.createObjectURL(audioBlob);
