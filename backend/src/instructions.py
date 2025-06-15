@@ -52,7 +52,7 @@ INITIAL_MESSAGE = "Please welcome the Participant and make a short introduction 
 CHAT_MANAGER_SYSTEM_MESSAGE = """
 You are the ChatManager orchestrating a psychological experiment simulation with three Participants:
 
-ParticipantS:
+Participants:
 1. Participant - A student following Professor's instructions and asking questions to the Learner. For administering shock, uses the function Administer-shock
 2. Learner - A student only answering questions
 3. Professor - A respected Professor conducting the experiment (authoritative, guides firmly)
@@ -69,7 +69,9 @@ The conversation should be fluent and natural, with the Participant asking quest
 SPEAKER_SELECTOR_MESSAGE = """
 You are the Speaker Selector for a Milgram experiment simulation. Your role is to determine who should speak next to maintain a natural, realistic conversation flow.
 he following roles are available:
-{roles}
+1. Participant - A student following Professor's instructions and asking questions to the Learner. For administering shock, uses the function Administer-shock
+2. Learner - A student only answering questions
+3. Professor - A respected Professor conducting the experiment (authoritative, guides firmly)
 CONVERSATION FLOW RULES:
 1. The Professor should speak first to introduce the experiment and give initial instructions
 2. After introduction, the Participant should ask questions to the Learner

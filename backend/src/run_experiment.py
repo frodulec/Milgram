@@ -1,8 +1,14 @@
-from autogen import (
+from autogen_agentchat.agents import (
     AssistantAgent,
-    GroupChat,
-    GroupChatManager,
+    UserProxyAgent,
 )
+from autogen_ext.models.openai import OpenAIChatCompletionClient
+from autogen_agentchat.ui import Console
+from autogen_agentchat.teams import (
+    SelectorGroupChat,
+)
+from autogen_core.tools import FunctionTool
+from autogen_core.models import ChatCompletionClient
 import os
 from dotenv import load_dotenv
 from instructions import (
@@ -18,6 +24,7 @@ import logging
 from models import States
 from utils.chat_utils import check_termination
 from models import Roles
+import asyncio
 
 logging.basicConfig(level=logging.INFO)  # or logging.DEBUG, logging.WARNING, etc.
 # Specifically set the level for Autogen's logger
@@ -62,6 +69,9 @@ def start_experiment(output_file_path: str = "conversation.json"):
         "cache_seed": None,
         "price": [0, 0],
     }
+    gpt_4o = OpenAIChatCompletionClient(
+        model="gpt-4o",
+    )
     llm_config = {
         "model": "gpt-4o",
         "api_key": os.environ["OPENAI_API_KEY"],
@@ -74,70 +84,73 @@ def start_experiment(output_file_path: str = "conversation.json"):
     #             "api_key": os.environ["TOGETHER_API_KEY"],
     #             "base_url": "https://api.together.xyz/v1"}
 
+    # Create the function tool
+    administer_shock_tool = FunctionTool(
+        press_button,
+        name="Administer-shock",
+        description="Function that raises the voltage and applies the voltage to the learner for bad answers. Can only be used after the learner has answered a question and the answer is wrong."
+    )
+
     participant = AssistantAgent(
         Roles.PARTICIPANT.value,
-        llm_config=llm_config,
+        model_client=gpt_4o,
         system_message=PARTICIPANT_SYSTEM_MESSAGE,
-        is_termination_msg=check_termination,
+        # is_termination_msg=check_termination,
+        tools=[administer_shock_tool],
     )
 
     learner = AssistantAgent(
         Roles.LEARNER.value,
-        llm_config=llm_config,
+        model_client=gpt_4o,
         system_message=LEARNER_SYSTEM_MESSAGE,
-        is_termination_msg=check_termination,
+        # is_termination_msg=check_termination,
     )
 
-    # Register the function signature with the agent that will suggest the call
-    participant.register_for_llm(
-        name="Administer-shock",
-        description="Function that raises the voltage and applies the voltage to the lernear for bad answers. Can only be used after the learner has answered a question and the answer is wrong.",
-    )(press_button)
 
-    # Register the function implementation with the same agent for execution
-    participant.register_for_execution(
-        name="Administer-shock",
-        description="Function that raises the voltage and applies the voltage to the lernear for bad answers. Can only be used after the learner has answered a question and the answer is wrong.",
-    )(press_button)
+    # description="Function that raises the voltage and applies the voltage to the lernear for bad answers. Can only be used after the learner has answered a question and the answer is wrong.",
 
     proffesor = AssistantAgent(
         Roles.PROFESSOR.value,
-        llm_config=llm_config,
+        model_client=gpt_4o,
         system_message=PROFESSOR_SYSTEM_MESSAGE,
-        is_termination_msg=check_termination,
+        # is_termination_msg=check_termination,
     )
 
-    group_chat = GroupChat(
-        agents=[
+    group_chat = SelectorGroupChat(
+        participants=[
             proffesor,
             learner,
             participant,
         ],
-        messages=[],
-        max_round=120,
-        select_speaker_message_template=SPEAKER_SELECTOR_MESSAGE,
+        model_client=gpt_4o,
+        # messages=[],
+        max_turns=120,
+        selector_prompt=SPEAKER_SELECTOR_MESSAGE.format(
+            agentlist=[Roles.PROFESSOR.value, Roles.LEARNER.value, Roles.PARTICIPANT.value]
+        ),
         # speaker_selection_method=group_chat_order,
     )
 
-    manager = GroupChatManager(
-        groupchat=group_chat,
-        llm_config=llm_config,
-        # system_message=CHAT_MANAGER_SYSTEM_MESSAGE,
-    )
-    chat = manager.initiate_chat(
-        proffesor,
-        message=INITIAL_MESSAGE,
-    )
-
-    costs_sum = sum(
-        [
-            bot.get_total_usage().get("total_cost", 0)
-            for bot in [participant, proffesor, learner]
-        ]
-    )
-    logger.info(f"Total cost: {costs_sum}")
+    # manager = GroupChatManager(
+    #     groupchat=group_chat,
+    #     llm_config=llm_config,
+    #     # system_message=CHAT_MANAGER_SYSTEM_MESSAGE,
+    # )
+    # chat = manager.initiate_chat(
+    #     proffesor,
+    #     message=INITIAL_MESSAGE,
+    # )
+    chat_stream = group_chat.run_stream(task=INITIAL_MESSAGE)
+    result = asyncio.run(Console(chat_stream))
+    # costs_sum = sum(
+    #     [
+    #         bot.get_total_usage().get("total_cost", 0)
+    #         for bot in [participant, proffesor, learner]
+    #     ]
+    # )
+    # logger.info(f"Total cost: {costs_sum}")
     data = convert_chat_history_to_json(chat, output_file_path)
 
 
 if __name__ == "__main__":
-    start_experiment()
+    start_experiment("test_conversation.json")

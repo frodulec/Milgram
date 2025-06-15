@@ -1,4 +1,3 @@
-from autogen import Agent, GroupChat, ChatResult
 from models import States, Roles
 import json
 
@@ -58,7 +57,7 @@ def check_if_administered_shock(message) -> bool:
     )
 
 def convert_chat_history_to_json(
-    chat: ChatResult, output_file_path: str = "conversation.json"
+    chat, output_file_path: str = "conversation.json"
 ) -> list[dict]:
     agent_names_mapping = {
         Roles.PROFESSOR.value: "Professor",

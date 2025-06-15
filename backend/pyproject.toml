@@ -5,7 +5,9 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "autogen>=0.9.1.post0",
+    "autogen-agentchat>=0.6.1",
+    "autogen-core>=0.6.1",
+    "autogen-ext>=0.6.1",
     "fastapi>=0.115.12",
     "ffmpeg>=1.4",
     "ffmpeg-python>=0.2.0",
